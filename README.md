@@ -2,7 +2,7 @@
 
 A minimal test-signal generator built on the same JUCE + WebView (Vite / React 19 / MUI 7) stack as the sibling plugins (ZeroComp / ZeroLimit / ZeroEQ). Generates a sine wave or pink noise; frequency and level are dialed in via a horizontal slider plus quick-jump preset buttons; an On / Off button mutes the output completely.
 
-Ships as VST3 / AU / AAX / Standalone, plus a **WebAssembly browser demo that reuses the exact same DSP**.
+Ships as **VST3 / AU / AAX / Standalone** on Windows / macOS and **VST3 / LV2 / CLAP / Standalone** on Linux, plus a **WebAssembly browser demo that reuses the exact same DSP**.
 
 ## Features
 
@@ -25,8 +25,10 @@ The UI uses MUI v7 with a dark theme and the Jost / Red Hat Mono fonts.
 - A C++17 toolchain
   - Windows: Visual Studio 2022 (Desktop development with C++ workload)
   - macOS: Xcode 14+
+  - Linux: gcc 13+ / clang + the apt packages listed under [Building on Linux](#building-on-linux)
 - Node.js 18+ and npm (for the WebUI build)
 - JUCE (included as a git submodule — run `git submodule update --init --recursive`)
+- `clap-juce-extensions` (also a git submodule, used only for the Linux CLAP target)
 - Optional: AAX SDK (place under `aax-sdk/` to enable AAX builds)
 - Optional: Inno Setup 6 (for the Windows installer)
 - Optional: [Emscripten](https://emscripten.org) (for building the Web demo WASM; this repo expects an emsdk checkout at `D:/Synching/code/JUCE/emsdk` on Windows)
@@ -45,9 +47,37 @@ cd webui && npm install && cd ..
 powershell -ExecutionPolicy Bypass -File build_windows.ps1 -Configuration Release
 # macOS
 ./build_macos.zsh
+# Linux (see "Building on Linux" below)
+bash build_linux.sh
 ```
 
 The Windows production script builds the WebUI, compiles VST3 / AAX / Standalone, signs the AAX (when `.env` provides PACE credentials), packages a ZIP, and runs Inno Setup to produce `TestTone_<VERSION>_Windows_Setup.exe`. Output lands under `releases/<VERSION>/Windows/`.
+
+### Building on Linux
+
+Tested on **WSL2 Ubuntu 24.04**, but should work on any modern glibc-based distro with `webkit2gtk-4.1` available.
+
+```bash
+sudo apt update
+sudo apt install -y \
+  build-essential pkg-config cmake ninja-build git \
+  libasound2-dev libjack-jackd2-dev libcurl4-openssl-dev \
+  libfreetype-dev libfontconfig1-dev \
+  libx11-dev libxcomposite-dev libxcursor-dev libxext-dev \
+  libxinerama-dev libxrandr-dev libxrender-dev \
+  libwebkit2gtk-4.1-dev libglu1-mesa-dev mesa-common-dev libgtk-3-dev
+
+git submodule update --init --recursive   # JUCE + clap-juce-extensions
+bash build_linux.sh                        # Release VST3 / LV2 / CLAP / Standalone + zip
+```
+
+Output:
+
+- Build artefacts: `build-linux/plugin/TestTone_artefacts/Release/{VST3,LV2,CLAP,Standalone}/`
+- Auto-installed: `~/.vst3/TestTone.vst3`, `~/.lv2/TestTone.lv2`, `~/.clap/TestTone.clap`
+- Distribution zip: `releases/<VERSION>/TestTone_<VERSION>_Linux_VST3_LV2_CLAP_Standalone.zip`
+
+LV2 and CLAP are gated behind `if(UNIX AND NOT APPLE)` in CMake, so existing Windows / macOS release flows are unaffected. AU and AAX are skipped on Linux as expected.
 
 ### Manual CMake build (development)
 

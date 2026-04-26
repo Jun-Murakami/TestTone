@@ -8,7 +8,7 @@
 ### 目的とスコープ
 
 - **目的**: シンプルかつ実用的なテスト信号ジェネレータ。サイン波 / ピンクノイズの 2 系統と、On/Off ボタンによる即時ミュートを備える。
-- **対象フォーマット**: VST3 / AU / AAX / Standalone
+- **対象フォーマット**: VST3 / AU / AAX / Standalone（Windows / macOS）+ VST3 / LV2 / CLAP / Standalone（Linux）
 - **機能要件**:
   - Sine / Pink Noise トグル（Pink Noise 時は Frequency を無効化）
   - Frequency: 20 Hz..20 kHz（log skew、既定 1 kHz）
@@ -96,6 +96,13 @@
     Remove-Item $tmp
     ```
     `C:\Program Files\OpenSSL-Win64\bin\openssl.exe` を使う場合は `OPENSSL_MODULES` の解決先が壊れているので Git for Windows 同梱の openssl を使うのが安全。署名後に出る `Warning! ... doesn't have a trusted root in the system.` は自己署名 dev cert ゆえの想定挙動なので無視で OK
+- Linux 配布ビルド: `bash build_linux.sh`（WSL2 Ubuntu 24.04 で動作確認）
+  - 成果物: `releases/<VERSION>/TestTone_<VERSION>_Linux_VST3_LV2_CLAP_Standalone.zip`。VST3 / LV2 / CLAP / Standalone を同梱
+  - 自動インストール先: `~/.vst3/TestTone.vst3`, `~/.lv2/TestTone.lv2`, `~/.clap/TestTone.clap`（VST3 / LV2 は JUCE の `COPY_PLUGIN_AFTER_BUILD`、CLAP は `build_linux.sh` 側で明示コピー）
+  - LV2 / CLAP は **Linux ビルドでのみ** 有効化（`if(UNIX AND NOT APPLE)` で条件分岐）。Windows / macOS の既存リリース経路には影響させない
+  - LV2URI: `https://junmurakami.com/plugins/testtone`（`plugin/CMakeLists.txt` の `juce_add_plugin` 内）。LV2 規約上 stable な URI 必須なのでバージョンを跨いで変更しない
+  - CLAP: `clap-juce-extensions` を submodule として取り込み、`clap_juce_extensions_plugin(... CLAP_ID "com.junmurakami.testtone" CLAP_FEATURES audio-effect utility)` を呼ぶ
+  - 必要 apt パッケージ: `build-essential pkg-config cmake ninja-build git libasound2-dev libjack-jackd2-dev libcurl4-openssl-dev libfreetype-dev libfontconfig1-dev libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev libwebkit2gtk-4.1-dev libglu1-mesa-dev mesa-common-dev libgtk-3-dev`
 
 ### Web デモ（WASM）
 
