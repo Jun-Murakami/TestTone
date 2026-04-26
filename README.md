@@ -3,6 +3,9 @@
 A minimal test-signal generator built on the same JUCE + WebView (Vite / React 19 / MUI 7) stack as the sibling plugins (ZeroComp / ZeroLimit / ZeroEQ). Generates a sine wave or pink noise; frequency and level are dialed in via a horizontal slider plus quick-jump preset buttons; an On / Off button mutes the output completely.
 
 Ships as **VST3 / AU / AAX / Standalone** on Windows / macOS and **VST3 / LV2 / CLAP / Standalone** on Linux, plus a **WebAssembly browser demo that reuses the exact same DSP**.
+https://testtone-demo.web.app/
+
+<img width="471" height="349" alt="image" src="https://github.com/user-attachments/assets/f43d29a2-1133-43ca-84e9-9e1c3003120f" />
 
 ## Features
 
