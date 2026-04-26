@@ -1,15 +1,23 @@
 {
   "name": "testtone-webui",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/sync-web-demos.cjs",
     "dev": "vite",
-    "prebuild": "license-checker --production --json --out src/assets/licenses.json",
+    "predev:web": "node scripts/sync-web-demos.cjs",
+    "dev:web": "vite --config vite.config.web.ts",
+    "prebuild": "node scripts/sync-web-demos.cjs && license-checker --production --json --out src/assets/licenses.json",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "prebuild:web": "node scripts/sync-web-demos.cjs",
+    "build:web": "vite build --config vite.config.web.ts",
     "preview": "vite preview",
-    "licenses": "license-checker --production --json --out src/assets/licenses.json"
+    "preview:web": "vite preview --config vite.config.web.ts",
+    "lint": "eslint .",
+    "licenses": "license-checker --production --json --out src/assets/licenses.json",
+    "sync-web-demos": "node scripts/sync-web-demos.cjs",
+    "deploy:web": "npm run build:web && firebase deploy --only hosting"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Box, Button, Paper, Tooltip, Typography } from '@mui/material';
+import { Box, Button, Paper, Tooltip, Typography, useMediaQuery } from '@mui/material';
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import { juceBridge } from './bridge/juce';
 import { useJuceComboBoxIndex, useJuceToggleValue } from './hooks/useJuceParam';
@@ -9,7 +9,12 @@ import { useHostShortcutForwarding } from './hooks/useHostShortcutForwarding';
 import { useGlobalZoomGuard } from './hooks/useGlobalZoomGuard';
 import { GlobalDialog } from './components/GlobalDialog';
 import LicenseDialog from './components/LicenseDialog';
+import { WebDemoMenu, MENU_WIDE_QUERY, MENU_DRAWER_WIDTH } from './components/WebDemoMenu';
 import './App.css';
+
+// Vite の `import.meta.env.VITE_RUNTIME` は Web ビルド (vite.config.web.ts) で 'web' に設定される。
+//  プラグインビルドでは undefined のままなので、IS_WEB_MODE は false 扱いになる。
+const IS_WEB_MODE = import.meta.env.VITE_RUNTIME === 'web';
 
 const FREQUENCY_PRESETS: PresetOption[] = [
   { value: 20, label: '20' },
@@ -72,6 +77,9 @@ function App() {
   useHostShortcutForwarding();
   useGlobalZoomGuard();
 
+  // 1200px 以上で右に常時表示の Drawer を置くため、外枠の右パディングを drawer 幅ぶん拡大する。
+  const wideDrawerDocked = useMediaQuery(MENU_WIDE_QUERY) && IS_WEB_MODE;
+
   // TONE_TYPE: 0 = Sine, 1 = Pink Noise
   const { index: toneTypeIndex, setIndex: setToneType } = useJuceComboBoxIndex('TONE_TYPE');
   const isPinkNoise = toneTypeIndex === 1;
@@ -115,6 +123,20 @@ function App() {
 
   const [licenseOpen, setLicenseOpen] = useState(false);
 
+  // Web モード時のオーディオ起動ガード。
+  //  AudioContext はユーザジェスチャ（クリック / タップ）の同期フレームでしか resume できないため、
+  //  最初のクリックまでオーバーレイを出して止める。プラグインモード（!IS_WEB_MODE）では何もしない。
+  const [audioStarted, setAudioStarted] = useState(!IS_WEB_MODE);
+  const handleStartAudio = () => {
+    // 同期フレーム内で起動。Web 版 juceBridge (webBridge) のみ ensureStarted を持つ。
+    //  プラグイン側では呼ばれても TypeScript の型に乗っていないだけで、Vite alias の都合
+    //  ランタイム上は web-juce.ts が解決されている。プラグインモードでは IS_WEB_MODE=false
+    //  なのでそもそもこのオーバーレイ自体が出ない。
+    const bridgeWithStart = juceBridge as unknown as { ensureStarted?: () => Promise<void> };
+    bridgeWithStart.ensureStarted?.();
+    setAudioStarted(true);
+  };
+
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
@@ -133,15 +155,49 @@ function App() {
       `}</style>
 
       <Box
-        sx={{
-          height: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          p: 2,
-          pt: 0,
-          overflow: 'hidden',
-        }}
+        sx={IS_WEB_MODE
+          ? {
+              // Web デモ時: 横幅 450px のカードにし、ページ中央寄せ + 上下に余白を確保
+              minHeight: '100vh',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1.5,
+              p: 2,
+              // 1200px 以上では右に常時表示 drawer が出るので、その幅ぶん右パディングを増やす
+              pr: wideDrawerDocked ? `${MENU_DRAWER_WIDTH + 16}px` : 2,
+            }
+          : {
+              // プラグイン時: ホストウィンドウ全面（450 × 265 固定）
+              height: '100vh',
+              display: 'flex',
+              flexDirection: 'column',
+              p: 2,
+              pt: 0,
+              overflow: 'hidden',
+            }
+        }
       >
+        <Box
+          sx={IS_WEB_MODE
+            ? {
+                width: 450,
+                maxWidth: '100%',
+                height: 265,
+                display: 'flex',
+                flexDirection: 'column',
+                borderRadius: 2,
+                boxShadow: 8,
+                backgroundColor: 'background.default',
+                position: 'relative',
+                overflow: 'hidden',
+                p: 2,
+                pt: 0,
+              }
+            : { display: 'contents' }
+          }
+        >
         {/* タイトル行 */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1, py: 0.5 }}>
           <Typography
@@ -340,10 +396,67 @@ function App() {
             wheelStepFine={0.1}
           />
         </Paper>
+
+          {/* Web デモ時のみ: ユーザジェスチャ前のオーディオ起動オーバーレイ */}
+          {IS_WEB_MODE && !audioStarted && (
+            <Box
+              onClick={handleStartAudio}
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1.5,
+                cursor: 'pointer',
+                backgroundColor: 'rgba(20, 20, 20, 0.85)',
+                backdropFilter: 'blur(2px)',
+                zIndex: 10,
+              }}
+            >
+              <Typography variant='body2' sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+                Click anywhere to start the audio engine
+              </Typography>
+              <Button
+                variant='contained'
+                onClick={handleStartAudio}
+                sx={{ minWidth: 120, fontWeight: 700 }}
+              >
+                START
+              </Button>
+              <Typography variant='caption' sx={{ color: 'text.disabled', fontSize: '0.7rem', mt: 0.5 }}>
+                Browsers require a user gesture before audio can play.
+              </Typography>
+            </Box>
+          )}
+        </Box>
+
+        {IS_WEB_MODE && (
+          <Box sx={{ width: 450, maxWidth: '100%', textAlign: 'center' }}>
+            <Typography
+              variant='caption'
+              color='text.secondary'
+              sx={{ display: 'block', fontSize: '0.7rem', lineHeight: 1.6, px: 2 }}
+            >
+              TestTone — sine / pink-noise generator. WebAssembly browser demo of the same DSP that runs inside the JUCE plugin.
+            </Typography>
+            <Typography
+              variant='caption'
+              color='text.secondary'
+              sx={{ display: 'block', fontSize: '0.7rem', lineHeight: 1.6, px: 2 }}
+            >
+              シンプルなテストトーン（サイン波 / ピンクノイズ）ジェネレータの WebAssembly ブラウザデモです。
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       <LicenseDialog open={licenseOpen} onClose={() => setLicenseOpen(false)} />
       <GlobalDialog />
+
+      {/* Web デモ時のみ右下にハンバーガーメニュー（>=1200px では右側に常時 docked） */}
+      {IS_WEB_MODE && <WebDemoMenu />}
     </ThemeProvider>
   );
 }

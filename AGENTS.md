@@ -45,5 +45,6 @@
 
 ## AAX / PACE
 
-- WrapGUID: `8BB21750-40C7-11F1-B00E-005056928F3B`（TestTone 固有）
-- `build_windows.ps1` / `build_macos.zsh` にハードコード済み。`PACE_ORGANIZATION` env でオーバーライド可
+- 認証情報・WrapGUID は **すべて `.env`** に書く（`PACE_USERNAME` / `PACE_PASSWORD` / `PACE_ORGANIZATION` / `PACE_KEYPASSWORD`）。ビルドスクリプトにハードコードしない
+- `.env` は `.gitignore` 対象。新規プラグイン立ち上げ時は姉妹リポジトリ（ZeroComp 等）の `.env` をコピーして `PACE_ORGANIZATION` を当該プラグインの WrapGUID に差し替える
+- **PFX は旧形式 (PBE-SHA1-3DES + SHA1 MAC) に変換しておく**。Win11 の `Export-PfxCertificate` は PBES2/AES-256 で書き出すが wraptool が読めず `Key file ... doesn't contain a valid signing certificate` で署名失敗する。OpenSSL (Git for Windows 同梱) で in-place 詰め直し: `pkcs12 -in <pfx> -nodes -passin pass:<pw> -out tmp.pem` → `pkcs12 -export -in tmp.pem -out <pfx> -passout pass:<pw> -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg SHA1 -legacy`。詳細は `CLAUDE.md` 参照

@@ -4,6 +4,7 @@ interface ImportMetaEnv {
   readonly PACKAGE_VERSION: string
   readonly VITE_APP_VERSION_FULL: string
   readonly VITE_BUILD_DATE: string
+  readonly VITE_RUNTIME?: string  // 'web' を vite.config.web.ts で注入。プラグインビルドでは undefined。
   readonly MODE: string
 }
 

@@ -391,13 +391,14 @@ fi
 if [[ ${BUILD_AAX} -eq 1 ]]; then
     echo_header "Step 3.5: PACE Eden 署名 (AAX macOS)"
 
-    # PACE アカウント情報。Windows 側 build_windows.ps1 と揃えた変数名セット:
-    #   PACE_USERNAME : iLok アカウント名
-    #   PACE_PASSWORD : iLok パスワード
-    # WCGUID は TestTone 固有のためスクリプト内に埋め込んでいる。
-    #   CI 等で別 GUID を使いたい場合は PACE_ORGANIZATION (旧 PACE_WCGUID) で上書きできる。
-    TESTTONE_WRAP_GUID="8BB21750-40C7-11F1-B00E-005056928F3B"
-    PACE_ORGANIZATION_EFFECTIVE="${PACE_ORGANIZATION:-${PACE_WCGUID:-${TESTTONE_WRAP_GUID}}}"
+    # PACE アカウント情報と WCGUID は .env (または環境変数) から取得。
+    # Windows 側 build_windows.ps1 と揃えた変数名セット:
+    #   PACE_USERNAME     : iLok アカウント名
+    #   PACE_PASSWORD     : iLok パスワード
+    #   PACE_ORGANIZATION : PACE Central Web で発行された WCGUID (プラグインごとに固有)
+    # 旧スクリプト互換のため PACE_WCGUID が設定されていて PACE_ORGANIZATION が未設定なら
+    # それを採用する。
+    PACE_ORGANIZATION_EFFECTIVE="${PACE_ORGANIZATION:-${PACE_WCGUID:-}}"
 
     # Guess wraptool location (can be overridden)
     WRAPTOOL_PATH_CANDIDATES=()

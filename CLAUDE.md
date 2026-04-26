@@ -83,14 +83,84 @@
 - AAX SDK は `aax-sdk/` 配下に配置された場合のみ自動的に有効化
 - Windows 配布ビルド: `powershell -File build_windows.ps1 -Configuration Release`
   - 成果物: `releases/<VERSION>/Windows/...` と `TestTone_<VERSION>_Windows_Setup.exe`（Inno Setup 6 必須）
-  - AAX 署名は `.env` に PACE 情報がある場合のみ自動実行
-  - WrapGUID は `8BB21750-40C7-11F1-B00E-005056928F3B`（TestTone 専用、build スクリプトに埋め込み済み）
-  - 環境変数 `PACE_ORGANIZATION` を立てれば一時的に別 GUID で署名可能
+  - AAX 署名は `.env` に PACE 情報（`PACE_USERNAME` / `PACE_PASSWORD` / `PACE_ORGANIZATION` / `PACE_KEYPASSWORD`）が揃っている場合のみ自動実行
+  - WrapGUID は `PACE_ORGANIZATION` env (= `.env`) に指定する（**ビルドスクリプトには埋め込まない**。プラグインごとに異なるため）。新規プラグイン立ち上げ時は姉妹リポジトリの `.env` をコピーして GUID だけ差し替える
+  - **PFX は必ず旧形式 (PBE-SHA1-3DES + SHA1 MAC) に詰め直す**。Windows 11 の `Export-PfxCertificate` は PBES2/AES-256 で書き出すが、PACE wraptool の内部 Windows コード署名 API はその新形式から鍵を取り出せず `Key file ... doesn't contain a valid signing certificate` で落ちる。PowerShell の `X509Certificate2Collection.Import(...)` も同じパスワードで `指定されたネットワーク パスワードが間違っています` を返すが `new X509Certificate2(...)` 単発コンストラクタは開ける、という症状が出たらこれ。`Export-PfxCertificate` 直後に下記を 1 度だけ流して in-place で旧形式に置き換える:
+    ```powershell
+    $env:OPENSSL_MODULES = 'C:\Program Files\Git\mingw64\lib\ossl-modules'
+    $ossl = 'C:\Program Files\Git\mingw64\bin\openssl.exe'
+    $tmp = "$env:TEMP\dev.pem"
+    & $ossl pkcs12 -in testtone-dev.pfx -nodes -passin 'pass:dev-pass-123' -out $tmp
+    & $ossl pkcs12 -export -in $tmp -out testtone-dev.pfx -passout 'pass:dev-pass-123' `
+      -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg SHA1 -legacy
+    Remove-Item $tmp
+    ```
+    `C:\Program Files\OpenSSL-Win64\bin\openssl.exe` を使う場合は `OPENSSL_MODULES` の解決先が壊れているので Git for Windows 同梱の openssl を使うのが安全。署名後に出る `Warning! ... doesn't have a trusted root in the system.` は自己署名 dev cert ゆえの想定挙動なので無視で OK
 
-### Web デモ
+### Web デモ（WASM）
 
-ZeroComp と異なり、TestTone のリポジトリには現状 Web デモ（WASM / Vite Web 設定 / Firebase）を含めていない。
-将来 Web デモを作る場合は ZeroComp の `wasm/`, `webui/vite.config.web.ts`, `webui/index.web.html`, `webui/.firebaserc`, `webui/firebase.json`, `webui/scripts/sync-web-demos.cjs`, `webui/public-web/` を参考にする。
+`wasm/src/tone_generator.h` がプラグイン版と同等の挙動を持つ純 C++ DSP。`wasm_exports.cpp` で JS 側に C ABI を露出する。
+
+エクスポート関数（C ABI）:
+- `dsp_init(sampleRate)` / `dsp_destroy()` / `dsp_reset()`
+- `dsp_alloc_buffer(n)` / `dsp_free_buffer(p)`
+- `dsp_set_type(int)` / `dsp_set_frequency_hz(float)` / `dsp_set_level_dbfs(float)`
+- `dsp_set_on(int)` / `dsp_set_channel_enabled(int ch, int enabled)`
+- `dsp_process_block(float* outL, float* outR, int n)`
+
+Web ブリッジ層（`webui/src/bridge/web/`）:
+- `WebParamState.ts` — `WebSliderState` / `WebToggleState` / `WebComboBoxState`
+  - juce-framework-frontend-mirror と同じ `valueChangedEvent.addListener` インターフェース
+- `juce-shim.ts` — TestTone のパラメータ（TONE_TYPE / FREQUENCY / DBFS / ON / CH_L / CH_R）を登録、
+  値変化を `webAudioEngine` 経由で WASM に流す
+- `WebAudioEngine.ts` — AudioContext 起動、worklet 接続、WASM ロード、パラメータ転送
+  - 起動前のパラメータは pendingParams に貯めておき、worklet 起動後に flush
+- `WebBridgeManager.ts` — `juceBridge` のドロップイン置換（`ensureStarted()` を追加）
+- `web-juce.ts` — `bridge/juce.ts` の置換用エントリ
+
+AudioWorklet（`webui/public-web/worklet/dsp-processor.js`）:
+- `init-wasm` メッセージで `WebAssembly.instantiate` → `dsp_init(sampleRate)`
+- `set-param` メッセージで `dsp_set_*` を呼ぶ
+- `process()` で 128 frame ごとに `dsp_process_block()` → outL/outR にコピー
+
+Vite 構成:
+- `vite.config.ts` — プラグインビルド（`outDir: ../plugin/ui/public`）
+- `vite.config.web.ts` — Web デモビルド（`outDir: dist`、`juce-framework-frontend-mirror` を `juce-shim.ts` に alias、`public-web/` を配信、`VITE_RUNTIME=web` を埋め込む）
+
+App.tsx の Web/プラグイン切替:
+- `IS_WEB_MODE = import.meta.env.VITE_RUNTIME === 'web'` で判定
+- Web 時は 450×265 のカード状レイアウトで中央寄せ + 起動オーバーレイ（ユーザジェスチャ前）を出す
+- プラグイン時はホストウィンドウ全面（450×265 固定）
+
+WASM ビルド（Windows）:
+```powershell
+& 'D:\Synching\code\JUCE\emsdk\emsdk_env.ps1'
+cd D:\Synching\code\JUCE\TestTone\wasm
+Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
+New-Item -ItemType Directory build | Out-Null
+cd build
+emcmake cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build .
+Copy-Item -Force dist\testtone_dsp.wasm ..\dist\
+Copy-Item -Force dist\testtone_dsp.wasm ..\..\webui\public-web\wasm\
+```
+
+emsdk_env.ps1 が遅い場合は env 変数を直接設定して `emcmake.bat` を絶対パスで呼ぶ:
+```powershell
+$env:EMSDK_PYTHON = "D:\Synching\code\JUCE\emsdk\python\3.13.3_64bit\python.exe"
+$env:EM_CONFIG = "D:\Synching\code\JUCE\emsdk\.emscripten"
+$env:EMSDK = "D:\Synching\code\JUCE\emsdk"
+$env:PATH = "D:\Synching\code\JUCE\emsdk\upstream\emscripten;$env:PATH"
+emcmake cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build .
+```
+
+**DSP に変更を入れたら必ず WASM (`wasm/src/tone_generator.h`) も同じ変更を反映して再ビルドし、`webui/public-web/wasm/` を更新する。** WASM を更新せず `npm run build:web` すると Web デモだけ旧ロジックのままになる。
+
+Firebase Hosting:
+- `webui/.firebaserc` のプロジェクト ID は `testtone-demo`（仮置き、実プロジェクトを Firebase Console で作成して合わせる）
+- `webui/firebase.json` で `dist/` を public、`*.wasm` に `Content-Type: application/wasm` ヘッダを付与
+- `npm run deploy:web` で `build:web` → `firebase deploy --only hosting`
 
 ### バージョン管理
 

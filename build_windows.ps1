@@ -337,13 +337,9 @@ if ($BuildAAX) {
             } else {
                 
                 # Check if PACE signing credentials are available.
-                # WrapGUID は TestTone 固有のため、env でも上書きできるが既定値をスクリプトに埋め込む。
-                # PACE_ORGANIZATION env が指定されていればそちらを優先（CI 等での切替用）。
-                $TestToneWrapGUID = "8BB21750-40C7-11F1-B00E-005056928F3B"
-                $WrapGUIDToUse = if ($env:PACE_ORGANIZATION) { $env:PACE_ORGANIZATION } else { $TestToneWrapGUID }
-
+                # WrapGUID（PACE_ORGANIZATION）はプラグイン固有なので .env / 環境変数で渡す前提。
                 $SkipAAXSigning = $false
-                $RequiredEnvVars = @("PACE_USERNAME", "PACE_PASSWORD", "PACE_KEYPASSWORD")
+                $RequiredEnvVars = @("PACE_USERNAME", "PACE_PASSWORD", "PACE_ORGANIZATION", "PACE_KEYPASSWORD")
                 $MissingVars = @()
 
                 foreach ($var in $RequiredEnvVars) {
@@ -359,7 +355,6 @@ if ($BuildAAX) {
                     $AAXSigningStatus = "credentials_missing"
                 } else {
                     Write-Host "PACE signing information detected. Executing AAX signing." -ForegroundColor Green
-                    Write-Host "  WrapGUID: $WrapGUIDToUse" -ForegroundColor Gray
                 }
 
                 if (-not $SkipAAXSigning) {
@@ -370,7 +365,7 @@ if ($BuildAAX) {
                         "--verbose",
                         "--account", $env:PACE_USERNAME,
                         "--password", $env:PACE_PASSWORD,
-                        "--wcguid", $WrapGUIDToUse,
+                        "--wcguid", $env:PACE_ORGANIZATION,
                         "--keyfile", $PfxPath,
                         "--keypassword", $env:PACE_KEYPASSWORD,
                         "--in", $DestAAX,

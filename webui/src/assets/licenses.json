@@ -831,6 +831,11 @@
     "path": "D:\\Synching\\code\\JUCE\\TestTone\\webui\\node_modules\\supports-preserve-symlinks-flag",
     "licenseFile": "D:\\Synching\\code\\JUCE\\TestTone\\webui\\node_modules\\supports-preserve-symlinks-flag\\LICENSE"
   },
+  "testtone-webui@1.0.0": {
+    "licenses": "UNLICENSED",
+    "private": true,
+    "path": "D:\\Synching\\code\\JUCE\\TestTone\\webui"
+  },
   "throttle-debounce@3.0.1": {
     "licenses": "MIT",
     "repository": "https://github.com/niksy/throttle-debounce",
@@ -870,11 +875,6 @@
     "email": "eemeli@gmail.com",
     "path": "D:\\Synching\\code\\JUCE\\TestTone\\webui\\node_modules\\cosmiconfig\\node_modules\\yaml",
     "licenseFile": "D:\\Synching\\code\\JUCE\\TestTone\\webui\\node_modules\\cosmiconfig\\node_modules\\yaml\\LICENSE"
-  },
-  "testtone-webui@1.1.2": {
-    "licenses": "UNLICENSED",
-    "private": true,
-    "path": "D:\\Synching\\code\\JUCE\\TestTone\\webui"
   },
   "zustand@5.0.12": {
     "licenses": "MIT",
