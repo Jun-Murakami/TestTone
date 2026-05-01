@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jun Murakami
 // TestTone DSP — Emscripten / WebAssembly 用の純 C++ 実装。
 //  プラグイン側 (plugin/src/dsp/ToneGenerator.{h,cpp}) と等価な振る舞いを保つ。
 //  JUCE 依存なし、std のみで完結。

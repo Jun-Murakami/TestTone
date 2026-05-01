@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jun Murakami
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, ButtonBase, Input, Slider, Typography } from '@mui/material';
 import { useJuceSliderValue } from '../hooks/useJuceParam';
