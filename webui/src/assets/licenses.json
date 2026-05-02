@@ -831,7 +831,7 @@
     "path": "/Users/jun/SourceCode/JUCE/TestTone/webui/node_modules/supports-preserve-symlinks-flag",
     "licenseFile": "/Users/jun/SourceCode/JUCE/TestTone/webui/node_modules/supports-preserve-symlinks-flag/LICENSE"
   },
-  "testtone-webui@1.0.0": {
+  "testtone-webui@1.0.1": {
     "licenses": "UNLICENSED",
     "private": true,
     "path": "/Users/jun/SourceCode/JUCE/TestTone/webui"
