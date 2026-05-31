@@ -64,6 +64,11 @@ private:
 
     bool useLocalDevServer = false;
 
+    // 固定サイズだが、分数スケーリング環境では初期ウィンドウの CSS ビューポートが設計より小さく
+    //  なるため、WebUI 読込時の apply_layout で固定サイズを「設計 CSS px × ratio」に合わせる
+    //  （MixCompare 方式）。初回のみ適用するためのフラグ。
+    bool initialLayoutApplied { false };
+
     std::atomic<bool> isShuttingDown{ false };
 
     // ホストから渡されるバスレイアウト（mono / stereo）を WebView に通知するための監視。

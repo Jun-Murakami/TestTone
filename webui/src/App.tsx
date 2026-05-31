@@ -107,6 +107,11 @@ function App() {
   useEffect(() => {
     juceBridge.whenReady(() => {
       juceBridge.callNative('system_action', 'ready');
+      // 固定サイズだが、初期ウィンドウを「設計 CSS px × ratio」に合わせる（MixCompare 方式）。
+      //  レイアウト確定後の値を使うため次フレームで送る。
+      requestAnimationFrame(() => {
+        juceBridge.callNative('window_action', 'apply_layout', window.innerWidth, window.innerHeight);
+      });
     });
   }, []);
 

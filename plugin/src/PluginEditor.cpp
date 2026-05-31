@@ -23,7 +23,7 @@
 
 namespace {
 
-std::vector<std::byte> streamToVector(juce::InputStream& stream)
+[[maybe_unused]] std::vector<std::byte> streamToVector(juce::InputStream& stream)
 {
     const auto sizeInBytes = static_cast<size_t>(stream.getTotalLength());
     std::vector<std::byte> result(sizeInBytes);
@@ -212,10 +212,32 @@ TestToneAudioProcessorEditor::TestToneAudioProcessorEditor(TestToneAudioProcesso
                   { handleSystemAction(args, std::move(completion)); })
               .withNativeFunction(
                   juce::Identifier{"window_action"},
-                  [](const juce::Array<juce::var>& /*args*/,
-                     juce::WebBrowserComponent::NativeFunctionCompletion completion)
+                  [this](const juce::Array<juce::var>& args,
+                         juce::WebBrowserComponent::NativeFunctionCompletion completion)
                   {
-                      // 固定サイズプラグインなのでリサイズ要求はすべて無視する。
+                      // 固定サイズプラグインなのでリサイズ要求(resizeTo 等)は無視するが、apply_layout
+                      //  だけは処理する。分数スケーリング環境では固定の論理サイズの CSS ビューポートが
+                      //  設計より小さくなるため、初回に固定サイズを「設計 CSS px × ratio」へ合わせる（MixCompare 方式）。
+                      if (args.size() >= 3 && args[0].toString() == "apply_layout")
+                      {
+                          const double cssW = static_cast<double>(args[1]);
+                          const double cssH = static_cast<double>(args[2]);
+                          const double ratioW = (cssW > 0.0) ? static_cast<double>(getWidth())  / cssW : 1.0;
+                          const double ratioH = (cssH > 0.0) ? static_cast<double>(getHeight()) / cssH : 1.0;
+                        #if JUCE_LINUX || JUCE_BSD
+                          if (! initialLayoutApplied)
+                          {
+                              initialLayoutApplied = true;
+                              const int w = juce::roundToInt(kFixedWidth  * ratioW);
+                              const int h = juce::roundToInt(kFixedHeight * ratioH);
+                              // 固定のまま（min==max）ratio 換算後の論理 px へ。min==max なので resizable には戻らない。
+                              setResizeLimits(w, h, w, h);
+                              setSize(w, h);
+                          }
+                        #endif
+                          completion(juce::var{ true });
+                          return;
+                      }
                       completion(juce::var{ false });
                   })
               .withNativeFunction(
@@ -276,6 +298,17 @@ TestToneAudioProcessorEditor::~TestToneAudioProcessorEditor()
 {
     isShuttingDown.store(true, std::memory_order_release);
     stopTimer();
+
+    // WebView を明示的に teardown してから破棄する。これをしないと Linux + NVIDIA で
+    //  Standalone 終了時に WebKit/EGL のクリーンアップ順序が崩れ、libEGL_nvidia の atexit で
+    //  SEGV する（JUCE 8.0.13 の外部サブプロセス化とあわせて確実にする。MixCompare と同じ手順）。
+    if (webViewLifetimeGuard.isConstructed())
+    {
+        webView.goToURL("about:blank");
+        webView.stop();
+        webView.setVisible(false);
+    }
+    removeChildComponent(&webView);
 }
 
 void TestToneAudioProcessorEditor::paint(juce::Graphics& g)

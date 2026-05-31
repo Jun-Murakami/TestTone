@@ -66,12 +66,10 @@ juce_add_plugin(TestTone
 
 juce_generate_juce_header(TestTone)
 
-# Linux ビルド時のみ CLAP ターゲットを生成（clap-juce-extensions 経由）
-if(UNIX AND NOT APPLE)
-    clap_juce_extensions_plugin(TARGET TestTone
-        CLAP_ID "com.junmurakami.testtone"
-        CLAP_FEATURES audio-effect utility)
-endif()
+# CLAP ターゲット生成（clap-juce-extensions 経由・Windows / macOS / Linux 全て）
+clap_juce_extensions_plugin(TARGET TestTone
+    CLAP_ID "com.junmurakami.testtone"
+    CLAP_FEATURES audio-effect utility)
 
 # ソースファイル
 target_sources(TestTone PRIVATE
@@ -126,6 +124,14 @@ target_link_libraries(TestTone
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
+
+# Linux: KeyEventForwarder の X11 キーイベント合成送出（XSendEvent 等）に libX11 を明示リンク。
+#  JUCE はプラグインターゲットへ X11 を直接リンクしないため、自前で追加する。
+if(UNIX AND NOT APPLE)
+    find_package(X11 REQUIRED)
+    target_link_libraries(TestTone PRIVATE ${X11_LIBRARIES})
+    target_include_directories(TestTone PRIVATE ${X11_INCLUDE_DIR})
+endif()
 
 # macOS: ヘッダパッド確保（署名/wraptool 対策）
 if(APPLE)
