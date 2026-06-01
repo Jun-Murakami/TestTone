@@ -133,6 +133,51 @@ static void queryWindowDpi(HWND hwnd, int& outDpi, double& outScale)
 
 } // namespace
 
+// Linux WebView スケール補正（global-scale）のディスクキャッシュ。createEditor で早期適用し、
+//  apply_layout で実測した値を書き戻す。未測定環境では何もしない（既存挙動を変えない）。
+//  global-scale は「実測」しないと分からない（apply_layout で測る）が、適用はホストが窓をサイズ決定
+//  する前＝ createEditor で行う必要がある（後から setGlobalScaleFactor すると editor の論理サイズが
+//  リスケールして中身が拡大してしまう）。そこで measured 値をディスクへキャッシュし、次回オープン時に
+//  早期適用する。未測定（=ファイル無し）の既定は補正なし(=1.0)なので、問題の無い環境は一切変えない。
+//  キャッシュ先は全プラグイン共有（JunMurakami/webview_scale_correction.cfg）。
+namespace tt {
+
+static juce::File webViewScaleCacheFile()
+{
+    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("JunMurakami").getChildFile("webview_scale_correction.cfg");
+}
+
+void applyCachedWebViewScaleCorrection()
+{
+   #if JUCE_LINUX || JUCE_BSD
+    const auto f = webViewScaleCacheFile();
+    if (! f.existsAsFile())
+        return; // 未測定環境は何もしない（= ロールバック状態と等価）
+
+    const double g = f.loadFileAsString().trim().getDoubleValue();
+    if (g > 0.0 && std::abs(g - (double) juce::Desktop::getInstance().getGlobalScaleFactor()) > 0.001)
+        juce::Desktop::getInstance().setGlobalScaleFactor((float) g);
+   #endif
+}
+
+void cacheWebViewScaleCorrection([[maybe_unused]] double globalScale)
+{
+   #if JUCE_LINUX || JUCE_BSD
+    if (globalScale <= 0.0)
+        return;
+    const auto f = webViewScaleCacheFile();
+    const double existing = f.existsAsFile() ? f.loadFileAsString().trim().getDoubleValue() : -1.0;
+    if (std::abs(existing - globalScale) > 0.001)
+    {
+        f.getParentDirectory().createDirectory();
+        f.replaceWithText(juce::String(globalScale, 6));
+    }
+   #endif
+}
+
+} // namespace tt
+
 // WebView2/Chromium の起動前に追加のコマンドライン引数を渡すためのヘルパー。
 //  ProTools(AAX, Windows) は AAX ラッパー時に DPI 非対応モードで動作することが多く、
 //  WebView2 の自動スケーリングがかかると UI が本来の意図より大きく表示されるため
@@ -221,18 +266,43 @@ TestToneAudioProcessorEditor::TestToneAudioProcessorEditor(TestToneAudioProcesso
                       if (args.size() >= 3 && args[0].toString() == "apply_layout")
                       {
                           const double cssW = static_cast<double>(args[1]);
-                          const double cssH = static_cast<double>(args[2]);
-                          const double ratioW = (cssW > 0.0) ? static_cast<double>(getWidth())  / cssW : 1.0;
-                          const double ratioH = (cssH > 0.0) ? static_cast<double>(getHeight()) / cssH : 1.0;
                         #if JUCE_LINUX || JUCE_BSD
                           if (! initialLayoutApplied)
                           {
                               initialLayoutApplied = true;
-                              const int w = juce::roundToInt(kFixedWidth  * ratioW);
-                              const int h = juce::roundToInt(kFixedHeight * ratioH);
-                              // 固定のまま（min==max）ratio 換算後の論理 px へ。min==max なので resizable には戻らない。
-                              setResizeLimits(w, h, w, h);
-                              setSize(w, h);
+                              // 固定サイズへ素の設計値で初期化する。ここで ratio 倍すると初回（スケールキャッシュ
+                              //  未生成）に WebView が過大描画して cssW≈2×getWidth となり ratio≈0.5 で editor が縮み、
+                              //  続く F 実測が誤った getWidth に対して行われ補正が壊れる。F 補正が分数スケールを
+                              //  扱うので素の設計値のままにする（min==max なので resizable には戻らない）。
+                              setResizeLimits(kFixedWidth, kFixedHeight, kFixedWidth, kFixedHeight);
+                              setSize(kFixedWidth, kFixedHeight);
+                          }
+
+                          // 【スケール補正・実測方式】Linux の WebView は out-of-process WebKit で、JUCE 親窓に対して
+                          //  何倍の backing を描くかが環境依存（GNOME 分数スケール下では膨れて中身が窓からはみ出す／
+                          //  KDE 等では等倍で問題なし）。これを実測して打ち消す:
+                          //    F = backing / parent = (innerWidth × DPR) / (getWidth × peerScale)
+                          //  global-scale を 1/F にすると「webview ソケットだけ」が縮み backing が親窓に一致する。
+                          //  F≈1 の環境（KDE 等）では何もしない＝既存挙動を壊さない（ハードコード無し）。固定サイズ
+                          //  なので ratio/constrainer/selfDriven は不要。setSize は同じ固定論理サイズへ戻すだけ。
+                          const double dpr = (args.size() >= 4) ? static_cast<double>(args[3]) : 0.0;
+                          if (auto* pp = getPeer())
+                          {
+                              const double peerScale = pp->getPlatformScaleFactor();
+                              if (dpr > 0.0 && cssW > 0.0 && peerScale > 0.0 && getWidth() > 0)
+                              {
+                                  const double F    = (cssW * dpr) / ((double) getWidth() * peerScale);
+                                  const double curG = (double) juce::Desktop::getInstance().getGlobalScaleFactor();
+                                  const double newG = curG / F;
+                                  if (std::abs(F - 1.0) > 0.01)
+                                  {
+                                      tt::cacheWebViewScaleCorrection(newG);
+                                      const int targetW = getWidth();
+                                      const int targetH = getHeight();
+                                      juce::Desktop::getInstance().setGlobalScaleFactor((float) newG);
+                                      setSize(targetW, targetH);
+                                  }
+                              }
                           }
                         #endif
                           completion(juce::var{ true });

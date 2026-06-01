@@ -152,6 +152,9 @@ bool TestToneAudioProcessor::hasEditor() const { return true; }
 
 juce::AudioProcessorEditor* TestToneAudioProcessor::createEditor()
 {
+    // スケール補正（Linux）: 前回 apply_layout で実測・キャッシュした global-scale を、ホストが窓を
+    //  サイズ決定する前に早期適用する（フラッシュ無し）。未測定環境では何もしない。
+    tt::applyCachedWebViewScaleCorrection();
     return new TestToneAudioProcessorEditor(*this);
 }
 
