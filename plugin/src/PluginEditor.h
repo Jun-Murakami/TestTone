@@ -9,13 +9,6 @@
 #include <memory>
 #include <optional>
 
-namespace tt {
-// Linux WebView スケール補正（global-scale）のディスクキャッシュ。createEditor で早期適用し、
-//  apply_layout で実測した値を書き戻す。未測定環境では何もしない（既存挙動を変えない）。
-void applyCachedWebViewScaleCorrection();
-void cacheWebViewScaleCorrection(double globalScale);
-}
-
 class TestToneAudioProcessorEditor : public juce::AudioProcessorEditor,
                                      private juce::Timer
 {
@@ -29,6 +22,7 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    void setScaleFactor(float newScale) override;
     void parentHierarchyChanged() override;
 
 private:
@@ -71,10 +65,12 @@ private:
 
     bool useLocalDevServer = false;
 
-    // 固定サイズだが、分数スケーリング環境では初期ウィンドウの CSS ビューポートが設計より小さく
-    //  なるため、WebUI 読込時の apply_layout で固定サイズを「設計 CSS px × ratio」に合わせる
-    //  （MixCompare 方式）。初回のみ適用するためのフラグ。
-    bool initialLayoutApplied { false };
+    // 埋め込みプラグイン時のウィンドウ物理サイズ補正: transform = webViewDpr / peerScale。
+    //  ホストの宣言スケール(誤判定)ではなく WebView の真のディスプレイ倍率を基準にする。Standalone は対象外。
+    //  固定サイズで settle 機構が無いため、適用後に 2-tick の 1px ジグルで WebView 子窓を追従させる。
+    void   applyDisplayScale();
+    double lastWebViewDpr { -1.0 };       // apply_layout で受け取る devicePixelRatio（真のディスプレイ倍率）
+    bool   resyncStep2Pending { false };  // Linux: transform 後の WebView 子窓追従ジグルの 2-tick 目
 
     std::atomic<bool> isShuttingDown{ false };
 
