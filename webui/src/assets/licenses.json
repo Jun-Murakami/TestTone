@@ -636,7 +636,7 @@
     "path": "D:\\Synching\\code\\JUCE\\TestTone\\webui\\node_modules\\supports-preserve-symlinks-flag",
     "licenseFile": "D:\\Synching\\code\\JUCE\\TestTone\\webui\\node_modules\\supports-preserve-symlinks-flag\\LICENSE"
   },
-  "testtone-webui@1.0.2": {
+  "testtone-webui@1.0.3": {
     "licenses": "UNLICENSED",
     "private": true,
     "path": "D:\\Synching\\code\\JUCE\\TestTone\\webui"
