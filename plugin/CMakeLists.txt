@@ -47,7 +47,7 @@ juce_add_plugin(TestTone
     PLUGIN_MANUFACTURER_CODE Jmbc
     PLUGIN_CODE TsTn
     FORMATS ${TESTTONE_FORMATS}
-    LV2URI "https://junmurakami.com/plugins/testtone"
+    LV2URI "https://junmurakami.com/apps/testtone"
     PLUGIN_AU_MAIN_TYPE "aufx"
     VST3_CATEGORIES "Fx" "Generator" "Tools"
     AAX_CATEGORY "AAX_ePlugInCategory_SWGenerators"
