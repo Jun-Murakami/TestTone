@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Jun Murakami
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "Version.h"
+#include "util/DiagnosticLog.h"
 
 #include <cmath>
 #include <memory>
@@ -31,6 +33,8 @@ TestToneAudioProcessor::TestToneAudioProcessor()
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       parameters(*this, nullptr, juce::Identifier("TestTone"), createParameterLayout())
 {
+    // WebView 起動診断ログ + Linux 描画/起動緩和策（エディタ生成より前に実行）
+    wvdiag::DiagnosticLog::install(TESTTONE_PRODUCT_NAME, TESTTONE_VERSION_STRING);
 }
 
 TestToneAudioProcessor::~TestToneAudioProcessor() = default;
